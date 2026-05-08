@@ -1,12 +1,17 @@
-.env
+# Huge Folders
 models/
-*.gguf
+node_modules/
+playwright_cache/
+# Sensitive Info
+.env
+homelab-troubleshooting-reference.md
+# Persistent Data
 litellm_db/
 hermes_data/
 open-webui/
 searxng/
 redis_data/
-playwright_cache/
-node_modules/
-homelab-troubleshooting-reference.md
-
+# OS/System
+.git/
+.DS_Store
+*.log
