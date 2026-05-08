@@ -1,0 +1,508 @@
+healthCheckTimeout: 60
+
+# ── Port map ────────────────────────────────────────────────
+#   8000  llama-swap  (entry point tunggal untuk semua traffic)
+#   8001  llama-server  model LLM   (di-swap oleh llama-swap)
+#   8002  llama-server  embedding   (always resident, ttl: 0)
+# ────────────────────────────────────────────────────────────
+
+# ── YAML Anchors ─────────────────────────────────────────────
+# Blok ini diabaikan llama-swap; hanya untuk DRY authoring.
+.anchors:
+  on_8001: &on_8001
+    ttl: 300
+    proxy: "http://127.0.0.1:8001"
+
+models:
+
+  # ══ Qwen3.5-2B-UD-Q4_K_XL ════════════════════════════════
+  # --no-mmproj-offload : mmproj tetap di CPU untuk hemat VRAM
+  # -np 1               : vision model tidak bisa share KV cache
+
+    # PRESET 1 — Thinking · General
+  # Thinking: ON  | temp=1.0, top_p=0.95, presence_penalty=1.5
+  # Terbaik untuk: analisis, penulisan, pertanyaan terbuka
+  "Qwen3.5-2B-UD-Q4_K_XL [Thinking · General]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-2B/Qwen3.5-2B-UD-Q4_K_XL.gguf --mmproj /models/models/Qwen3.5-2B/mmproj-F16.gguf
+      --fit on --mlock
+      -c 32768 -t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q8_0 --cache-type-v q8_0
+      --flash-attn on --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0
+      --presence-penalty 1.5 --repeat-penalty 1.0
+      --cache-reuse 256
+      --chat-template-kwargs '{"enable_thinking":true}'
+
+  # PRESET 2 — Thinking · Coding
+  # Thinking: ON  | temp=0.6, presence_penalty=0.0
+  # Terbaik untuk: algoritma kompleks, debugging, keputusan arsitektur
+  "Qwen3.5-2B-UD-Q4_K_XL [Thinking · Coding]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-2B/Qwen3.5-2B-UD-Q4_K_XL.gguf --mmproj /models/models/Qwen3.5-2B/mmproj-F16.gguf
+      --fit on --mlock
+      -c 32768 -t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q8_0 --cache-type-v q8_0
+      --flash-attn on --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0.0
+      --presence-penalty 0.0 --repeat-penalty 1.0
+      --chat-template-kwargs '{"enable_thinking":true}'
+
+  # PRESET 3 — Instruct · General
+  # Thinking: OFF | temp=0.7, top_p=0.8, presence_penalty=1.5
+  # Terbaik untuk: summarisasi, Q&A, chat, tugas sehari-hari
+  "Qwen3.5-2B-UD-Q4_K_XL [Instruct · General]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-2B/Qwen3.5-2B-UD-Q4_K_XL.gguf --mmproj /models/models/Qwen3.5-2B/mmproj-F16.gguf
+      --fit on --mlock
+      -c 32768 -t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q8_0 --cache-type-v q8_0
+      --flash-attn on --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 0.7 --top-p 0.8 --top-k 20 --min-p 0.0
+      --presence-penalty 1.5 --repeat-penalty 1.0
+      --chat-template-kwargs '{"enable_thinking":false}'
+
+  # PRESET 4 — Instruct · Reasoning
+  # Thinking: OFF | temp=1.0, top_p=0.95, presence_penalty=1.5
+  # Terbaik untuk: logika, matematika, reasoning terstruktur tanpa overhead CoT
+  "Qwen3.5-2B-UD-Q4_K_XL [Instruct · Reasoning]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-2B/Qwen3.5-2B-UD-Q4_K_XL.gguf --mmproj /models/models/Qwen3.5-2B/mmproj-F16.gguf
+      --fit on --mlock
+      -c 32768 -t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q8_0 --cache-type-v q8_0
+      --flash-attn on --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0
+      --presence-penalty 1.5 --repeat-penalty 1.0
+      --chat-template-kwargs '{"enable_thinking":false}'
+
+  # PRESET 5 — Instruct · Coding
+  # Thinking: OFF | temp=0.6, presence_penalty=0.0
+  # Terbaik untuk: coding langsung, snippet cepat
+  "Qwen3.5-2B-UD-Q4_K_XL [Instruct · Coding]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-2B/Qwen3.5-2B-UD-Q4_K_XL.gguf --mmproj /models/models/Qwen3.5-2B/mmproj-F16.gguf
+      --fit on --mlock
+      -c 32768 -t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q8_0 --cache-type-v q8_0
+      --flash-attn on --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0.0
+      --presence-penalty 0.0 --repeat-penalty 1.0
+      --chat-template-kwargs '{"enable_thinking":false}'
+
+
+  # ══ Qwen3.5-4B-UD-Q4_K_XL ════════════════════════════════
+  # --no-mmproj-offload : mmproj tetap di CPU untuk hemat VRAM
+  # -np 1               : vision model tidak bisa share KV cache
+
+  # PRESET 1 — Thinking · General
+  # Thinking: ON  | temp=1.0, top_p=0.95, presence_penalty=1.5
+  # Terbaik untuk: analisis, penulisan, pertanyaan terbuka
+  # Configured for Hermes Agent
+  "Qwen3.5-4B-UD-Q4_K_XL [Thinking · General]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-4B/Qwen3.5-4B-UD-Q4_K_XL.gguf --mmproj /models/models/Qwen3.5-4B/mmproj-F16.gguf
+      --fit on --mlock
+      -c 65536 -t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q4_0 --cache-type-v q4_0
+      --flash-attn off --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0
+      --presence-penalty 1.5 --repeat-penalty 1.0
+      --cache-reuse 256
+      --chat-template-kwargs '{"enable_thinking":true}'
+
+  # PRESET 2 — Thinking · Coding
+  # Thinking: ON  | temp=0.6, presence_penalty=0.0
+  # Terbaik untuk: algoritma kompleks, debugging, keputusan arsitektur
+  "Qwen3.5-4B-UD-Q4_K_XL [Thinking · Coding]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-4B/Qwen3.5-4B-UD-Q4_K_XL.gguf --mmproj /models/models/Qwen3.5-4B/mmproj-F16.gguf
+      --fit on --mlock
+      -c 32768 t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q8_0 --cache-type-v q8_0
+      --flash-attn on --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0.0
+      --presence-penalty 0.0 --repeat-penalty 1.0
+      --chat-template-kwargs '{"enable_thinking":true}'
+
+  # PRESET 3 — Instruct · General
+  # Thinking: OFF | temp=0.7, top_p=0.8, presence_penalty=1.5
+  # Terbaik untuk: summarisasi, Q&A, chat, tugas sehari-hari
+  # Configured for Hermes Agent
+  "Qwen3.5-4B-UD-Q4_K_XL [Instruct · General]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-4B/Qwen3.5-4B-UD-Q4_K_XL.gguf
+      --mmproj /models/models/Qwen3.5-4B/mmproj-F16.gguf
+      --fit on --mlock
+      -c 65536 -t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q4_0 --cache-type-v q4_0
+      --flash-attn off --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 0.7 --top-p 0.8 --top-k 20 --min-p 0.0
+      --presence-penalty 1.5 --repeat-penalty 1.0
+      --reasoning off
+
+  # PRESET 4 — Instruct · Reasoning
+  # Thinking: OFF | temp=1.0, top_p=0.95, presence_penalty=1.5
+  # Terbaik untuk: logika, matematika, reasoning terstruktur tanpa overhead CoT
+  "Qwen3.5-4B-UD-Q4_K_XL [Instruct · Reasoning]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-4B/Qwen3.5-4B-UD-Q4_K_XL.gguf --mmproj /models/models/Qwen3.5-4B/mmproj-F16.gguf
+      --fit on --mlock
+      -c 32768 -t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q8_0 --cache-type-v q8_0
+      --flash-attn on --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0
+      --presence-penalty 1.5 --repeat-penalty 1.0
+      --chat-template-kwargs '{"enable_thinking":false}'
+
+  # PRESET 5 — Instruct · Coding
+  # Thinking: OFF | temp=0.6, presence_penalty=0.0
+  # Terbaik untuk: coding langsung, snippet cepat
+  "Qwen3.5-4B-UD-Q4_K_XL [Instruct · Coding]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-4B/Qwen3.5-4B-UD-Q4_K_XL.gguf --mmproj /models/models/Qwen3.5-4B/mmproj-F16.gguf
+      --fit on --mlock
+      -c 32768 t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q8_0 --cache-type-v q8_0
+      --flash-attn on --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0.0
+      --presence-penalty 0.0 --repeat-penalty 1.0
+      --chat-template-kwargs '{"enable_thinking":false}'
+
+  # ══ Qwen3.5-9B-UD-Q4_K_XL ════════════════════════════════
+  # Model & hardware flags identik di semua preset; hanya sampling yang berbeda.
+  # Jika output gibberish: turunkan ke -c 8192, ganti cache type ke bf16.
+
+  # PRESET 1 — Thinking · General
+  # Thinking: ON  | temp=1.0, top_p=0.95, presence_penalty=1.5
+  # Terbaik untuk: analisis, penulisan, pertanyaan terbuka
+  "Qwen3.5-9B-UD-Q4_K_XL [Thinking · General]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-9B/Qwen3.5-9B-UD-Q4_K_XL.gguf --mmproj /models/models/Qwen3.5-9B/mmproj-F16.gguf
+      --fit on --mlock
+      -c 32768 -t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q8_0 --cache-type-v q8_0
+      --flash-attn on --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0
+      --presence-penalty 1.5 --repeat-penalty 1.0
+      --cache-reuse 256
+      --chat-template-kwargs '{"enable_thinking":true}'
+
+  # PRESET 2 — Thinking · Coding
+  # Thinking: ON  | temp=0.6, presence_penalty=0.0
+  # Terbaik untuk: algoritma kompleks, debugging, keputusan arsitektur
+  "Qwen3.5-9B-UD-Q4_K_XL [Thinking · Coding]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-9B/Qwen3.5-9B-UD-Q4_K_XL.gguf --mmproj /models/models/Qwen3.5-9B/mmproj-F16.gguf
+      --fit on --mlock
+      -c 32768 -t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q8_0 --cache-type-v q8_0
+      --flash-attn on --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0.0
+      --presence-penalty 0.0 --repeat-penalty 1.0
+      --chat-template-kwargs '{"enable_thinking":true}'
+
+  # PRESET 3 — Instruct · General
+  # Thinking: OFF | temp=0.7, top_p=0.8, presence_penalty=1.5
+  # Terbaik untuk: summarisasi, Q&A, chat, tugas sehari-hari
+  "Qwen3.5-9B-UD-Q4_K_XL [Instruct · General]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-9B/Qwen3.5-9B-UD-Q4_K_XL.gguf --mmproj /models/models/Qwen3.5-9B/mmproj-F16.gguf
+      --fit on --mlock
+      -c 32768 -t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q8_0 --cache-type-v q8_0
+      --flash-attn on --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 0.7 --top-p 0.8 --top-k 20 --min-p 0.0
+      --presence-penalty 1.5 --repeat-penalty 1.0
+      --chat-template-kwargs '{"enable_thinking":false}'
+
+  # PRESET 4 — Instruct · Reasoning
+  # Thinking: OFF | temp=1.0, top_p=0.95, presence_penalty=1.5
+  # Terbaik untuk: logika, matematika, reasoning terstruktur tanpa overhead CoT
+  "Qwen3.5-9B-UD-Q4_K_XL [Instruct · Reasoning]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-9B/Qwen3.5-9B-UD-Q4_K_XL.gguf --mmproj /models/models/Qwen3.5-9B/mmproj-F16.gguf
+      --fit on --mlock
+      -c 32768 -t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q8_0 --cache-type-v q8_0
+      --flash-attn on --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0
+      --presence-penalty 1.5 --repeat-penalty 1.0
+      --chat-template-kwargs '{"enable_thinking":false}'
+
+  # PRESET 5 — Instruct · Coding
+  # Thinking: OFF | temp=0.6, presence_penalty=0.0
+  # Terbaik untuk: coding langsung, snippet cepat
+  "Qwen3.5-9B-UD-Q4_K_XL [Instruct · Coding]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-9B/Qwen3.5-9B-UD-Q4_K_XL.gguf --mmproj /models/models/Qwen3.5-9B/mmproj-F16.gguf
+      --fit on --mlock
+      -c 32768 -t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q8_0 --cache-type-v q8_0
+      --flash-attn on --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0.0
+      --presence-penalty 0.0 --repeat-penalty 1.0
+      --chat-template-kwargs '{"enable_thinking":false}'
+
+
+  # ══ Qwen3.5-27B-UD-Q3_K_XL ═══════════════════════════════
+  # Model & hardware flags identik di semua preset; hanya sampling yang berbeda.
+  # Jika output gibberish: turunkan ke -c 8192, ganti cache type ke bf16.
+
+  # PRESET 1 — Thinking · General
+  # Thinking: ON  | temp=1.0, top_p=0.95, presence_penalty=1.5
+  # Terbaik untuk: analisis, penulisan, pertanyaan terbuka
+  "Qwen3.5-27B-UD-Q3_K_XL [Thinking · General]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-27B/Qwen3.5-27B-UD-Q3_K_XL.gguf --mmproj /models/models/Qwen3.5-27B/mmproj-F16.gguf
+      --fit on --mlock
+      -c 32768 -t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q8_0 --cache-type-v q8_0
+      --flash-attn on --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0
+      --presence-penalty 1.5 --repeat-penalty 1.0
+      --cache-reuse 256
+      --chat-template-kwargs '{"enable_thinking":true}'
+
+  # PRESET 2 — Thinking · Coding
+  # Thinking: ON  | temp=0.6, presence_penalty=0.0
+  # Terbaik untuk: algoritma kompleks, debugging, keputusan arsitektur
+  "Qwen3.5-27B-UD-Q3_K_XL [Thinking · Coding]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-27B/Qwen3.5-27B-UD-Q3_K_XL.gguf --mmproj /models/models/Qwen3.5-27B/mmproj-F16.gguf
+      --fit on --mlock
+      -c 32768 -t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q8_0 --cache-type-v q8_0
+      --flash-attn on --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0.0
+      --presence-penalty 0.0 --repeat-penalty 1.0
+      --chat-template-kwargs '{"enable_thinking":true}'
+
+  # PRESET 3 — Instruct · General
+  # Thinking: OFF | temp=0.7, top_p=0.8, presence_penalty=1.5
+  # Terbaik untuk: summarisasi, Q&A, chat, tugas sehari-hari
+  "Qwen3.5-27B-UD-Q3_K_XL [Instruct · General]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-27B/Qwen3.5-27B-UD-Q3_K_XL.gguf --mmproj /models/models/Qwen3.5-27B/mmproj-F16.gguf
+      --fit on --mlock
+      -c 32768 -t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q8_0 --cache-type-v q8_0
+      --flash-attn on --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 0.7 --top-p 0.8 --top-k 20 --min-p 0.0
+      --presence-penalty 1.5 --repeat-penalty 1.0
+      --chat-template-kwargs '{"enable_thinking":false}'
+
+  # PRESET 4 — Instruct · Reasoning
+  # Thinking: OFF | temp=1.0, top_p=0.95, presence_penalty=1.5
+  # Terbaik untuk: logika, matematika, reasoning terstruktur tanpa overhead CoT
+  "Qwen3.5-27B-UD-Q3_K_XL [Instruct · Reasoning]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-27B/Qwen3.5-27B-UD-Q3_K_XL.gguf --mmproj /models/models/Qwen3.5-27B/mmproj-F16.gguf
+      --fit on --mlock
+      -c 32768 -t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q8_0 --cache-type-v q8_0
+      --flash-attn on --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0
+      --presence-penalty 1.5 --repeat-penalty 1.0
+      --chat-template-kwargs '{"enable_thinking":false}'
+
+  # PRESET 5 — Instruct · Coding
+  # Thinking: OFF | temp=0.6, presence_penalty=0.0
+  # Terbaik untuk: coding langsung, snippet cepat
+  "Qwen3.5-27B-UD-Q3_K_XL [Instruct · Coding]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-27B/Qwen3.5-27B-UD-Q3_K_XL.gguf --mmproj /models/models/Qwen3.5-27B/mmproj-F16.gguf
+      --fit on --mlock
+      -c 32768 -t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q8_0 --cache-type-v q8_0
+      --flash-attn on --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0.0
+      --presence-penalty 0.0 --repeat-penalty 1.0
+      --chat-template-kwargs '{"enable_thinking":false}'
+
+  # ══ Qwen3.5-35B-A3B-UD-IQ3_S ═══════════════════════════════
+  # Model & hardware flags identik di semua preset; hanya sampling yang berbeda.
+  # Jika output gibberish: turunkan ke -c 8192, ganti cache type ke bf16.
+
+  # PRESET 1 — Thinking · General
+  # Thinking: ON  | temp=1.0, top_p=0.95, presence_penalty=1.5
+  # Terbaik untuk: analisis, penulisan, pertanyaan terbuka
+  "Qwen3.5-35B-A3B-UD-IQ3_S [Thinking · General]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-35B-A3B/Qwen3.5-35B-A3B-UD-IQ3_S.gguf --mmproj /models/models/Qwen3.5-35B-A3B/mmproj-F16.gguf      --fit on --mlock
+      -c 32768 -t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q8_0 --cache-type-v q8_0
+      --flash-attn on --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0
+      --presence-penalty 1.5 --repeat-penalty 1.0
+      --cache-reuse 256
+      --chat-template-kwargs '{"enable_thinking":true}'
+
+  # PRESET 2 — Thinking · Coding
+  # Thinking: ON  | temp=0.6, presence_penalty=0.0
+  # Terbaik untuk: algoritma kompleks, debugging, keputusan arsitektur
+  "Qwen3.5-35B-A3B-UD-IQ3_S [Thinking · Coding]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-35B-A3B/Qwen3.5-35B-A3B-UD-IQ3_S.gguf --mmproj /models/models/Qwen3.5-35B-A3B/mmproj-F16.gguf      --fit on --mlock
+      -c 32768 -t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q8_0 --cache-type-v q8_0
+      --flash-attn on --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0.0
+      --presence-penalty 0.0 --repeat-penalty 1.0
+      --chat-template-kwargs '{"enable_thinking":true}'
+
+  # PRESET 3 — Instruct · General
+  # Thinking: OFF | temp=0.7, top_p=0.8, presence_penalty=1.5
+  # Terbaik untuk: summarisasi, Q&A, chat, tugas sehari-hari
+  "Qwen3.5-35B-A3B-UD-IQ3_S [Instruct · General]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-35B-A3B/Qwen3.5-35B-A3B-UD-IQ3_S.gguf --mmproj /models/models/Qwen3.5-35B-A3B/mmproj-F16.gguf      --fit on --mlock
+      -c 32768 -t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q8_0 --cache-type-v q8_0
+      --flash-attn on --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 0.7 --top-p 0.8 --top-k 20 --min-p 0.0
+      --presence-penalty 1.5 --repeat-penalty 1.0
+      --chat-template-kwargs '{"enable_thinking":false}'
+
+  # PRESET 4 — Instruct · Reasoning
+  # Thinking: OFF | temp=1.0, top_p=0.95, presence_penalty=1.5
+  # Terbaik untuk: logika, matematika, reasoning terstruktur tanpa overhead CoT
+  "Qwen3.5-35B-A3B-UD-IQ3_S [Instruct · Reasoning]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-35B-A3B/Qwen3.5-35B-A3B-UD-IQ3_S.gguf --mmproj /models/models/Qwen3.5-35B-A3B/mmproj-F16.gguf
+      --fit on --mlock
+      -c 32768 -t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q8_0 --cache-type-v q8_0
+      --flash-attn on --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0
+      --presence-penalty 1.5 --repeat-penalty 1.0
+      --chat-template-kwargs '{"enable_thinking":false}'
+
+  # PRESET 5 — Instruct · Coding
+  # Thinking: OFF | temp=0.6, presence_penalty=0.0
+  # Terbaik untuk: coding langsung, snippet cepat
+  "Qwen3.5-35B-A3B-UD-IQ3_S [Instruct · Coding]":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Qwen3.5-35B-A3B/Qwen3.5-35B-A3B-UD-IQ3_S.gguf --mmproj /models/models/Qwen3.5-35B-A3B/mmproj-F16.gguf
+      --fit on --mlock
+      -c 32768 -t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q8_0 --cache-type-v q8_0
+      --flash-attn on --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0.0
+      --presence-penalty 0.0 --repeat-penalty 1.0
+      --chat-template-kwargs '{"enable_thinking":false}'
+
+
+  # ══ Gemma 4 E4B ═══════════════════════════════════════════
+
+  "gemma-4-E4B-it-UD-Q4_K_XL":
+    <<: *on_8001
+    cmd: >
+      /app/llama-server
+      --port 8001 --host 0.0.0.0
+      --model /models/models/Gemma4-E4B/gemma-4-E4B-it-UD-Q4_K_XL.gguf --mmproj /models/models/Gemma4-E4B/mmproj-F16.gguf
+      --fit on --mlock
+      -c 32768 -t 4 -tb 4 -b 512 -ub 256
+      --cache-type-k q8_0 --cache-type-v q8_0
+      --flash-attn on --jinja --no-warmup --no-mmproj-offload -np 1
+      --temp 1.0 --top-p 0.95 --top-k 64
+
+
+  # ══ Embeddings ════════════════════════════════════════════
+  # ttl: 0  = tidak pernah di-unload (selalu warm untuk RAG)
+  # ngl: 0  = CPU only — 0 VRAM, ~1.1 GB RAM
+  # -np 4   = 4 parallel slots untuk RAG batch ingestion
+  # -tb 4   = semua logical thread untuk batch embedding
+
+  "bge-m3-q8_0.gguf":
+    ttl: 0
+    proxy: "http://127.0.0.1:8002"
+    cmd: >
+      /app/llama-server
+      --port 8002 --host 0.0.0.0
+      --model /models/models/embeddModels/bge-m3-q8_0/bge-m3-q8_0.gguf
+      --embedding --pooling cls
+      --mlock --flash-attn on
+      -ngl 0 -t 4 -tb 4
+      -c 8192 -ub 8192 -np 4
+
+
+hooks:
+  on_startup:
+    preload:
+      - "bge-m3-q8_0.gguf"

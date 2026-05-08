@@ -1,0 +1,103 @@
+general_settings:
+  master_key: "os.environ/LITELLM_MASTER_KEY"
+  read_timeout: 600    # Tunggu sampai 10 menit untuk jawaban
+  connect_timeout: 100 # Tunggu koneksi tersambung
+  request_timeout: 600 # Total waktu tunggu permintaan
+
+model_list:
+  # --- GRUP HERMES (Otomatis Fallback berurutan dari atas ke bawah) ---
+  
+  # 1. Pilihan Pertama (OpenRouter - GPT 120B)
+  - model_name: "OpenRouter" 
+    litellm_params:
+      model: openrouter/openai/gpt-oss-120b:free
+      api_key: os.environ/OPENROUTER_API_KEY
+      extra_headers:
+        HTTP-Referer: "http://127.0.0.1"
+        X-Title: "AI-Stack-Local"
+  
+  # 2. Cadangan Kedua (OpenRouter - GLM)
+  - model_name: "OpenRouter"
+    litellm_params:
+      model: openrouter/z-ai/glm-4.5-air:free
+      api_key: os.environ/OPENROUTER_API_KEY # Jangan pakai dummy-key!
+      extra_headers:
+        HTTP-Referer: "http://127.0.0.1"
+        X-Title: "AI-Stack-Local"
+
+  # 3. Cadangan Ketiga (OpenRouter - Gemma)
+  - model_name: "OpenRouter"
+    litellm_params:
+      model: openrouter/google/gemma-4-31b-it:free
+      api_key: os.environ/OPENROUTER_API_KEY # Jangan pakai dummy-key!
+      extra_headers:
+        HTTP-Referer: "http://127.0.0.1"
+        X-Title: "AI-Stack-Local"
+  
+  # # 4. Cadangan TERAKHIR (Mesin Lokal - Qwen 4B)
+  # - model_name: "OpenRouter"
+  #   litellm_params:
+  #     model: "openai/Qwen3.5-4B-UD-Q4_K_XL [Thinking · General]"
+  #     api_base: http://127.0.0.1:8000/v1 # INI BENAR, hanya lokal yang pakai ini
+  #     api_key: dummy-key
+
+  # --- GRUP MODEL LANGSUNG (Bisa dipilih manual di OpenWebUI) ---
+  - model_name: "Qwen3.5-4B-Thingking"
+    litellm_params:
+      model: "openai/Qwen3.5-4B-UD-Q4_K_XL [Thinking · General]"
+      api_base: http://127.0.0.1:8000/v1
+      api_key: dummy-key
+      timeout: 600
+  
+  - model_name: "Qwen3.5-4B-Instruct"
+    litellm_params:
+      model: "openai/Qwen3.5-4B-UD-Q4_K_XL [Instruct · General]"
+      api_base: http://127.0.0.1:8000/v1
+      api_key: dummy-key
+      timeout: 600
+
+  - model_name: "Gemini-High"
+    litellm_params:
+      model: gemini/gemini-3.1-flash-lite-preview
+      api_key: "os.environ/GEMINI_API_KEY"
+
+  - model_name: "Gemini-High"
+    litellm_params:
+      model: gemini/gemini-3-flash-preview
+      api_key: "os.environ/GEMINI_API_KEY"
+
+  - model_name: "Gemini-High"
+    litellm_params:
+      model: gemini/gemini-2.5-flash
+      api_key: "os.environ/GEMINI_API_KEY"
+  
+  - model_name: "Gemini-High"
+    litellm_params:
+      model: gemini/gemini-2.5-flash-lite
+      api_key: "os.environ/GEMINI_API_KEY"
+  
+  - model_name: "Gemini-Low"
+    litellm_params:
+      model: gemini/gemma-4-31b-it
+      api_key: "os.environ/GEMINI_API_KEY"
+
+  - model_name: "Gemini-Low"
+    litellm_params:
+      model: gemini/gemma-4-26b-a4b-it
+      api_key: "os.environ/GEMINI_API_KEY"
+      
+# Not supported Anymore
+  # - model_name: "Gemini-Low"
+  #   litellm_params:
+  #     model: gemini/gemma-3-27b
+  #     api_key: "os.environ/GEMINI_API_KEY"
+
+  # - model_name: "Gemini-Low"
+  #   litellm_params:
+  #     model: gemini/gemma-3-12b
+  #     api_key: "os.environ/GEMINI_API_KEY"
+
+
+
+router_settings:
+  routing_strategy: usage-based-routing-v2

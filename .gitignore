@@ -1,0 +1,12 @@
+.env
+models/
+*.gguf
+litellm_db/
+hermes_data/
+open-webui/
+searxng/
+redis_data/
+playwright_cache/
+node_modules/
+homelab-troubleshooting-reference.md
+
