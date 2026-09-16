@@ -1,215 +1,112 @@
 services:
-  litellm-db:
-    image: postgres:16-alpine
-    container_name: litellm-db
+  omniroute:
+    image: diegosouzapw/omniroute:latest
+    container_name: omniroute
     restart: unless-stopped
-    network_mode: "host"
-    environment:
-      # - LITELLM_MASTER_KEY=sk-hermes-1234 
-      # # - DATABASE_URL=postgresql://litellm:litellm@127.0.0.1:5432/litellm
-      # # - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - POSTGRES_USER=${DB_USER}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_DB=${DB_NAME}
+    ports:
+      - "10.40.0.10:4000:20128"
     volumes:
-      - ./litellm_db:/var/lib/postgresql/data
-
-  litellm:
-    image: ghcr.io/berriai/litellm:main-latest
-    container_name: litellm
-    restart: unless-stopped
-    network_mode: "host"
-    volumes:
-      - ./litellm_config.yaml:/app/config.yaml
+      - ./omniroute-data:/app/data
     environment:
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
-      # Gunakan protokol postgresql sesuai permintaan Prisma
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@127.0.0.1:5432/${DB_NAME}
-    command: [ "--config", "/app/config.yaml", "--port", "4000" ]
+      - NODE_ENV=production
+      - PORT=20128
+      - DATA_DIR=/app/data
+      - JWT_SECRET=${OMNIROUTE_JWT_SECRET}
+      - API_KEY_SECRET=${OMNIROUTE_API_KEY_SECRET}
+      - STORAGE_ENCRYPTION_KEY=${OMNIROUTE_ENC_KEY}
+      - STORAGE_ENCRYPTION_KEY_VERSION=v1
+      - MACHINE_ID_SALT=${OMNIROUTE_SALT}
+      - REDIS_URL=redis://redis:6379
     depends_on:
-      - litellm-db
-
-  hermes-gateway:
-    image: nousresearch/hermes-agent:latest
-    container_name: hermes-gateway
-    restart: unless-stopped
-    network_mode: "host"
-    command: gateway run
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    env_file: .env # Wajib ada agar ${VAR} terbaca
-    volumes:
-      - ./hermes_data:/opt/data
-      - ./hermes_data/output:/output
-      - ./playwright_cache:/opt/hermes/.playwright
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ~/ai-stack/searxng-mcp:/app/searxng-mcp
-    environment:
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - TELEGRAM_ALLOWED_USERS=${TELEGRAM_ALLOWED_USERS}
-      # --- KUNCI UTAMA DI SINI ---
-      - LLM_PROVIDER=openai
-      - LLM_MODEL=OpenRouter   # Model default awal
-      - LLM_API_BASE_URL=http://litellm:4000/v1
-      - LLM_API_KEY=${LITELLM_MASTER_KEY}
-      # Variabel pendukung
-      - HERMES_HOME=/opt/data
-      - HERMES_API_ENABLED=true
-      # - WEB_BACKEND=searxng
-      # - SEARXNG_BASE_URL=http://127.0.0.1:8888      
-      # - BROWSER_PROVIDER=browser
-    deploy:
-      resources:
-        limits:
-          memory: 4G
-          cpus: "2.0"
-    depends_on:
-      - litellm
-
-  hermes-dashboard:
-    image: nousresearch/hermes-agent:latest
-    container_name: hermes-dashboard
-    user: "0:0"
-    restart: unless-stopped
-    network_mode: "host"
-    command: dashboard --host 0.0.0.0 --insecure
-    volumes:
-      - ./hermes_data:/opt/data
-      - ./hermes_data/output:/output
-    environment:
-      # Gunakan base URL saja, dashboard akan menangani sisanya
-      - GATEWAY_HEALTH_URL=http://127.0.0.1:8080
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: "0.5"
-    depends_on:
-      - hermes-gateway
-
-  redis:
-    image: redis:alpine
-    container_name: redis
-    restart: unless-stopped
-    network_mode: "host"
-    command: redis-server --bind 127.0.0.1
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
-  searxng:
-    image: searxng/searxng:latest
-    container_name: searxng
-    restart: unless-stopped
-    network_mode: "host"
-    volumes:
-      - ./searxng:/etc/searxng:rw
-    env_file: .env
-    environment:
-      - SEARXNG_BASE_URL=http://localhost:8888/
-      - SEARXNG_SECRET=${SEARXNG_SECRET}
-      - GRANIAN_PORT=8888
-      - GRANIAN_HOST=0.0.0.0
-    cap_drop:
-      - ALL
-    cap_add:
-      - CHOWN
-      - SETGID
-      - SETUID
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8888/"]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
-
-  llama-swap:
-    image: ghcr.io/mostlygeek/llama-swap:vulkan
-    init: true
-    container_name: llama-swap
-    network_mode: host
-    ipc: host
-    restart: unless-stopped
-    devices:
-      - /dev/dri:/dev/dri
-    group_add:
-      - "44"
-      - "107"
-    
-    command: ["-config", "/app/config.yaml", "-listen", "0.0.0.0:8000", "-watch-config"]
-    volumes:
-      - ./llama-swap.yaml:/app/config.yaml:ro
-      - /home/alta/ai-stack:/models:ro
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 60s
-
-  open-webui:
-    image: ghcr.io/open-webui/open-webui:main-slim
-    container_name: open-webui
-    restart: unless-stopped
-    network_mode: "host"
-    volumes:
-      - ./open-webui:/app/backend/data
-    env_file: .env
-    environment:
-      # === Core ===
-      - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY}
-      - ANONYMIZED_TELEMETRY=false
-      - ENABLE_SIGNUP=true
-      - ENABLE_COMMUNITY_SHARING=false
-      - ENABLE_MESSAGE_RATING=false
-
-      # === Disable unused features ===
-      - ENABLE_IMAGE_GENERATION=false
-      - ENABLE_OAUTH_SIGNUP=false
-
-      # === LLM backend — all traffic through llama-swap ===
-      # URL 1 (LiteLLM) ; URL 2 (Llama-swap)
-      - OPENAI_API_BASE_URLS=http://127.0.0.1:4000/v1;http://127.0.0.1:8000/v1
-      # Key 1 (Untuk LiteLLM) ; Key 2 (Placeholder untuk Llama-swap)
-      - OPENAI_API_KEYS=${LITELLM_MASTER_KEY};dummy-key
-      
-      # === Ollama disabled ===
-      - ENABLE_OLLAMA_API=false
-
-      # === Redis session cache ===
-      - REDIS_URL=redis://127.0.0.1:6379/0
-      - ENABLE_WEBSOCKET_SUPPORT=true
-      - WEBSOCKET_MANAGER=redis
-
-      # === RAG — embeddings routed through llama-swap (port 8000) ===
-      - RAG_EMBEDDING_ENGINE=openai
-      - RAG_OPENAI_API_BASE_URL=http://127.0.0.1:8000/v1
-      - RAG_OPENAI_API_KEY=dummy
-      - RAG_EMBEDDING_MODEL=bge-m3-q8_0.gguf
-      - CHUNK_SIZE=1024
-      - CHUNK_OVERLAP=128
-      - RAG_TOP_K=8
-
-      # === Web Search via SearXNG ===
-      - ENABLE_RAG_WEB_SEARCH=true
-      - RAG_WEB_SEARCH_ENGINE=searxng
-      - SEARXNG_QUERY_URL=http://127.0.0.1:8888/search?q=<query>&format=json
-      - RAG_WEB_SEARCH_RESULT_COUNT=10
-      - RAG_WEB_SEARCH_CONCURRENT_REQUESTS=2
-      - ENABLE_RAG_LOCAL_WEB_FETCH=true
-
-      # Reset Database next restart (true)
-      - RESET_CONFIG_ON_START=false
-      
-    depends_on:
-      searxng:
-        condition: service_healthy
       redis:
         condition: service_healthy
-      llama-swap:
-        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    container_name: omniroute-redis
+    restart: unless-stopped
+    volumes:
+      - ./omniroute-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # --- PRIVACY & PII MASKING LAYER ---
+  # Presidio moved from Microsoft's registry to the independent Data Privacy
+  # Stack org in 2026 (MIT license unchanged). Images now live under
+  # ghcr.io/data-privacy-stack/ instead of mcr.microsoft.com/.
+  presidio-analyzer:
+    image: ghcr.io/data-privacy-stack/presidio-analyzer:latest
+    container_name: presidio-analyzer
+    restart: unless-stopped
+
+  presidio-anonymizer:
+    image: ghcr.io/data-privacy-stack/presidio-anonymizer:latest
+    container_name: presidio-anonymizer
+    restart: unless-stopped
+
+  litellm-proxy:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: litellm-proxy
+    restart: unless-stopped
+    ports:
+      - "10.40.0.10:4004:4000"
+    volumes:
+      - ./litellm-config.yaml:/app/config.yaml
+    environment:
+      - OMNIROUTE_API_KEY=${OMNIROUTE_API_KEY}
+      - PRESIDIO_ANALYZER_API_BASE=http://presidio-analyzer:3000
+      - PRESIDIO_ANONYMIZER_API_BASE=http://presidio-anonymizer:3000
+    command: ["--config", "/app/config.yaml"]
+    depends_on:
+      - presidio-analyzer
+      - presidio-anonymizer
+      - omniroute
+
+  # --- CHAT & AGENT LAYERS ---
+  # Both chat surfaces route through litellm-proxy (not omniroute directly)
+  # so PII masking actually applies to every prompt, agentic and interactive.
+  hermes-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.hermes
+    container_name: hermes-agent
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+    ports:
+      - "10.40.0.10:4001:8642"
+      - "10.40.0.10:4002:9119"
+    volumes:
+      - ./hermes-data:/opt/data
+    environment:
+      - OPENAI_BASE_URL=http://litellm-proxy:4000/v1
+      - OPENAI_API_KEY=${OMNIROUTE_API_KEY}
+      - HERMES_DASHBOARD=true
+      - HERMES_DASHBOARD_BASIC_AUTH_USERNAME=${HERMES_DASH_USER}
+      - HERMES_DASHBOARD_BASIC_AUTH_PASSWORD=${HERMES_DASH_PASS}
+    depends_on:
+      - litellm-proxy
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    restart: unless-stopped
+    ports:
+      - "10.40.0.10:4003:8080"
+    volumes:
+      - ./open-webui-data:/app/backend/data
+    environment:
+      - OPENAI_API_BASE_URL=http://litellm-proxy:4000/v1
+      - OPENAI_API_KEY=${OMNIROUTE_API_KEY}
+      # Local CPU-based RAG configuration
+      - RAG_EMBEDDING_ENGINE=sentence_transformers
+      - RAG_EMBEDDING_MODEL=nomic-ai/nomic-embed-text-v1.5
+    depends_on:
+      - litellm-proxy
+
+networks:
+  default:
+    name: ai-network

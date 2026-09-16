@@ -5,10 +5,11 @@ playwright_cache/
 # Sensitive Info
 .env
 # Persistent Data
-hermes-data/
-omniroute-data/
-omniroute-redis-data/
-open-webui-data/
+litellm_db/
+hermes_data/
+open-webui/
+searxng/
+redis_data/
 # OS/System
 .git/
 .DS_Store
