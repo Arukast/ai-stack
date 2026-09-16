@@ -91,7 +91,9 @@ services:
       - litellm-proxy
 
   open-webui:
-    image: ghcr.io/open-webui/open-webui:main
+    build:
+      context: .
+      dockerfile: Dockerfile.open-webui
     container_name: open-webui
     restart: unless-stopped
     ports:
@@ -102,8 +104,7 @@ services:
       - OPENAI_API_BASE_URL=http://litellm-proxy:4000/v1
       - OPENAI_API_KEY=${OMNIROUTE_API_KEY}
       # Local CPU-based RAG configuration
-      - RAG_EMBEDDING_ENGINE=sentence_transformers
-      - RAG_EMBEDDING_MODEL=nomic-ai/nomic-embed-text-v1.5
+      - RAG_EMBEDDING_MODEL=BAAI/bge-m3
     depends_on:
       - litellm-proxy
 
