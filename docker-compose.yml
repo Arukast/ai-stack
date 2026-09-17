@@ -1,8 +1,16 @@
+x-logging: &default-logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
 services:
   omniroute:
     image: diegosouzapw/omniroute:latest
     container_name: omniroute
     restart: unless-stopped
+    <<: *default-logging
     ports:
       - "10.40.0.10:4000:20128"
     volumes:
@@ -17,14 +25,28 @@ services:
       - STORAGE_ENCRYPTION_KEY_VERSION=v1
       - MACHINE_ID_SALT=${OMNIROUTE_SALT}
       - REDIS_URL=redis://redis:6379
+    healthcheck:
+      # Verify this matches omniroute's actual health endpoint
+      test: ["CMD", "wget", "-qO-", "http://localhost:20128/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     depends_on:
       redis:
         condition: service_healthy
+    networks: [ai-network, ai-backend]
+    deploy:
+      resources:
+        limits:
+          memory: 512m
 
   redis:
     image: redis:7-alpine
     container_name: omniroute-redis
     restart: unless-stopped
+    <<: *default-logging
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - ./omniroute-redis-data:/data
     healthcheck:
@@ -32,6 +54,15 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    networks: [ai-backend]
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    deploy:
+      resources:
+        limits:
+          memory: 320m
 
   # --- PRIVACY & PII MASKING LAYER ---
   # Presidio moved from Microsoft's registry to the independent Data Privacy
@@ -41,16 +72,49 @@ services:
     image: ghcr.io/data-privacy-stack/presidio-analyzer:latest
     container_name: presidio-analyzer
     restart: unless-stopped
+    <<: *default-logging
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks: [ai-backend]
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    deploy:
+      resources:
+        limits:
+          memory: 768m
 
   presidio-anonymizer:
     image: ghcr.io/data-privacy-stack/presidio-anonymizer:latest
     container_name: presidio-anonymizer
     restart: unless-stopped
+    <<: *default-logging
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks: [ai-backend]
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    deploy:
+      resources:
+        limits:
+          memory: 256m
 
   litellm-proxy:
     image: ghcr.io/berriai/litellm:main-latest
     container_name: litellm-proxy
     restart: unless-stopped
+    <<: *default-logging
     ports:
       - "10.40.0.10:4004:4000"
     volumes:
@@ -60,10 +124,24 @@ services:
       - PRESIDIO_ANALYZER_API_BASE=http://presidio-analyzer:3000
       - PRESIDIO_ANONYMIZER_API_BASE=http://presidio-anonymizer:3000
     command: ["--config", "/app/config.yaml"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health/liveliness"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     depends_on:
-      - presidio-analyzer
-      - presidio-anonymizer
-      - omniroute
+      presidio-analyzer:
+        condition: service_healthy
+      presidio-anonymizer:
+        condition: service_healthy
+      omniroute:
+        condition: service_healthy
+    networks: [ai-network, ai-backend]
+    deploy:
+      resources:
+        limits:
+          memory: 512m
 
   # --- CHAT & AGENT LAYERS ---
   # Both chat surfaces route through litellm-proxy (not omniroute directly)
@@ -74,6 +152,7 @@ services:
       dockerfile: Dockerfile.hermes
     container_name: hermes-agent
     restart: unless-stopped
+    <<: *default-logging
     tty: true
     stdin_open: true
     ports:
@@ -87,8 +166,24 @@ services:
       - HERMES_DASHBOARD=true
       - HERMES_DASHBOARD_BASIC_AUTH_USERNAME=${HERMES_DASH_USER}
       - HERMES_DASHBOARD_BASIC_AUTH_PASSWORD=${HERMES_DASH_PASS}
+      - SEARXNG_BASE_URL=http://searxng:8080
+    healthcheck:
+      # Adjust to whichever of the two exposed ports actually serves a health route
+      test: ["CMD", "wget", "-qO-", "http://localhost:9119/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     depends_on:
-      - litellm-proxy
+      litellm-proxy:
+        condition: service_healthy
+      searxng:
+        condition: service_started
+    networks: [ai-network]
+    deploy:
+      resources:
+        limits:
+          memory: 512m
 
   open-webui:
     build:
@@ -96,6 +191,7 @@ services:
       dockerfile: Dockerfile.open-webui
     container_name: open-webui
     restart: unless-stopped
+    <<: *default-logging
     ports:
       - "10.40.0.10:4003:8080"
     volumes:
@@ -105,9 +201,55 @@ services:
       - OPENAI_API_KEY=${OMNIROUTE_API_KEY}
       # Local CPU-based RAG configuration
       - RAG_EMBEDDING_MODEL=BAAI/bge-m3
+      - ENABLE_RAG_WEB_SEARCH=true
+      - RAG_WEB_SEARCH_ENGINE=searxng
+      - SEARXNG_QUERY_URL=http://searxng:8080/search?q=<query>&format=json
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     depends_on:
-      - litellm-proxy
+      litellm-proxy:
+        condition: service_healthy
+      searxng:
+        condition: service_started
+    networks: [ai-network]
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  # --- WEB SEARCH ---
+  # Self-hosted meta-search so hermes-agent / open-webui web search doesn't
+  # depend on a third-party search API key. Needs real outbound internet
+  # access, so it stays off the internal-only ai-backend network.
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    container_name: searxng
+    restart: unless-stopped
+    <<: *default-logging
+    volumes:
+      - ./searxng-data:/etc/searxng
+    environment:
+      - SEARXNG_BASE_URL=http://searxng:8080/
+      - SEARXNG_SECRET_KEY=${SEARXNG_SECRET_KEY}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    cap_drop: [ALL]
+    networks: [ai-network]
+    deploy:
+      resources:
+        limits:
+          memory: 256m
 
 networks:
-  default:
+  ai-network:
     name: ai-network
+  ai-backend:
+    internal: true
