@@ -230,7 +230,7 @@ services:
     restart: unless-stopped
     <<: *default-logging
     volumes:
-      - ./searxng-data:/etc/searxng
+      - ./searxng-data/settings.yml:/etc/searxng/settings.yml:ro
     environment:
       - SEARXNG_BASE_URL=http://searxng:8080/
       - SEARXNG_SECRET_KEY=${SEARXNG_SECRET_KEY}
@@ -240,7 +240,12 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
-    cap_drop: [ALL]
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
     networks: [ai-network]
     deploy:
       resources:

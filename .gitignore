@@ -9,7 +9,6 @@ hermes-data/
 omniroute-data/
 omniroute-redis-data/
 open-webui-data/
-searxng-data/
 # OS/System
 .git/
 .DS_Store
