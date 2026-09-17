@@ -25,6 +25,7 @@ services:
       - STORAGE_ENCRYPTION_KEY_VERSION=v1
       - MACHINE_ID_SALT=${OMNIROUTE_SALT}
       - REDIS_URL=redis://redis:6379
+      - SEARXNG_BASE_URL=http://searxng:8080
     healthcheck:
       test: ["CMD", "node", "healthcheck.mjs"]
       interval: 30s
