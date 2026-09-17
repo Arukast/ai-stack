@@ -4,15 +4,16 @@ model_list:
       model: openai/*
       api_base: http://omniroute:20128/v1
       api_key: os.environ/OMNIROUTE_API_KEY
+      guardrails:
+        - "presidio-pii"
 
 guardrails:
   - guardrail_name: "presidio-pii"
     litellm_params:
       guardrail: presidio
-      mode: "pre_call"
-      # Restores real values in the model's reply instead of leaving
-      # placeholders like <PERSON> in what you see. Test a round-trip
-      # after deploying — this path has had bugs on some providers.
+      mode:
+        - "pre_call"
+        - "post_call"
       output_parse_pii: true
       presidio_language: "en"
       pii_entities_config:

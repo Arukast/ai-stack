@@ -38,14 +38,14 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512m
+          memory: 1g
 
   redis:
     image: redis:7-alpine
     container_name: omniroute-redis
     restart: unless-stopped
     <<: *default-logging
-    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --pidfile /tmp/redis.pid
     user: "999:999"
     volumes:
       - ./omniroute-redis-data:/data
@@ -125,7 +125,7 @@ services:
       - PRESIDIO_ANONYMIZER_API_BASE=http://presidio-anonymizer:3000
     command: ["--config", "/app/config.yaml"]
     healthcheck:
-      test: ["CMD", "python3", "-c", "import requests; exit() if requests.get('http://localhost:4000/health/readiness').status_code == 200 else exit(1)"]
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/readiness')"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -177,7 +177,7 @@ services:
       litellm-proxy:
         condition: service_healthy
       searxng:
-        condition: service_started
+        condition: service_healthy
     networks: [ai-network]
     deploy:
       resources:
@@ -213,12 +213,12 @@ services:
       litellm-proxy:
         condition: service_healthy
       searxng:
-        condition: service_started
+        condition: service_healthy
     networks: [ai-network]
     deploy:
       resources:
         limits:
-          memory: 1g
+          memory: 5g
 
   # --- WEB SEARCH ---
   # Self-hosted meta-search so hermes-agent / open-webui web search doesn't
