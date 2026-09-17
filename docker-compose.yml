@@ -26,11 +26,10 @@ services:
       - MACHINE_ID_SALT=${OMNIROUTE_SALT}
       - REDIS_URL=redis://redis:6379
     healthcheck:
-      # Verify this matches omniroute's actual health endpoint
-      test: ["CMD", "wget", "-qO-", "http://localhost:20128/health"]
-      interval: 10s
+      test: ["CMD", "node", "healthcheck.mjs"]
+      interval: 30s
       timeout: 5s
-      retries: 5
+      retries: 3
       start_period: 15s
     depends_on:
       redis:
@@ -51,9 +50,11 @@ services:
       - ./omniroute-redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
+      interval: 10s
       timeout: 3s
-      retries: 5
+      retries: 3
+      start_period: 5s
+
     networks: [ai-backend]
     read_only: true
     tmpfs:
