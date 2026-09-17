@@ -168,7 +168,7 @@ services:
       - HERMES_DASHBOARD_BASIC_AUTH_PASSWORD=${HERMES_DASH_PASS}
       - SEARXNG_BASE_URL=http://searxng:8080
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8642/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:9119/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -200,9 +200,9 @@ services:
       - OPENAI_API_KEY=${OMNIROUTE_API_KEY}
       # Local CPU-based RAG configuration
       - RAG_EMBEDDING_MODEL=BAAI/bge-m3
-      - ENABLE_RAG_WEB_SEARCH=true
-      - RAG_WEB_SEARCH_ENGINE=searxng
-      - SEARXNG_QUERY_URL=http://searxng:8080/search?q=<query>&format=json
+      - ENABLE_WEB_SEARCH=true
+      - WEB_SEARCH_ENGINE=searxng
+      - SEARXNG_QUERY_URL=http://searxng:8080/search?q=<query>
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/health')"]
       interval: 30s
