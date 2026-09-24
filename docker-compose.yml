@@ -74,6 +74,10 @@ services:
     container_name: presidio-analyzer
     restart: unless-stopped
     <<: *default-logging
+    volumes:
+      - ./secret_recognizers.yaml:/app/config/secret_recognizers.yaml:ro
+    environment:
+      - ANALYZER_CONF_FILE=/app/config/secret_recognizers.yaml
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s

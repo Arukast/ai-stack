@@ -1,4 +1,21 @@
 model_list:
+  # Prefix "protected/" routes requests to OmniRoute via Presidio
+  - model_name: "protected/*"
+    litellm_params:
+      model: openai/*
+      api_base: http://omniroute:20128/v1
+      api_key: os.environ/OMNIROUTE_API_KEY
+      guardrails:
+        - "presidio-pii"
+
+  # Prefix "raw/" routes requests directly to OmniRoute bypassing Presidio
+  - model_name: "raw/*"
+    litellm_params:
+      model: openai/*
+      api_base: http://omniroute:20128/v1
+      api_key: os.environ/OMNIROUTE_API_KEY
+
+  # Default fallback catch-all (runs Presidio)
   - model_name: "*"
     litellm_params:
       model: openai/*
@@ -19,6 +36,6 @@ guardrails:
       pii_entities_config:
         EMAIL_ADDRESS: "MASK"
         PHONE_NUMBER: "MASK"
-        PERSON: "MASK"
         CREDIT_CARD: "MASK"
         US_SSN: "MASK"
+        SECRET_KEY: "MASK"
